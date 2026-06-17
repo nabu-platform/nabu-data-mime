@@ -58,11 +58,29 @@ jobs:
           path: poms
 
       - name: Install published modules BOM
-        run: >-
-          mvn -B dependency:get
-          -Dartifact=be.nabu:modules-bom:1.0-SNAPSHOT:pom
-          -DrepoUrl=https://maven.pkg.github.com/nabu-platform/maven
-          -Dtransitive=false
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_url="https://maven.pkg.github.com/nabu-platform/maven/be/nabu/modules-bom/1.0-SNAPSHOT"
+          auth="$GITHUB_ACTOR:$GITHUB_TOKEN"
+          metadata="$RUNNER_TEMP/modules-bom-metadata.xml"
+          curl -fsSL -u "$auth" "$base_url/maven-metadata.xml" -o "$metadata"
+          value=$(python3 - <<'PY' "$metadata"
+import sys
+import xml.etree.ElementTree as ET
+root = ET.parse(sys.argv[1]).getroot()
+value = root.findtext('./versioning/snapshotVersions/snapshotVersion[extension="pom"]/value')
+if not value:
+	raise SystemExit('Could not resolve snapshot POM version from metadata')
+print(value)
+PY
+)
+          bom_pom="$RUNNER_TEMP/modules-bom-$value.pom"
+          curl -fsSL -u "$auth" "$base_url/modules-bom-$value.pom" -o "$bom_pom"
+          mvn -B install:install-file -Dpackaging=pom -Dfile="$bom_pom" -DpomFile="$bom_pom"
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install modules parent pom
         working-directory: poms
