@@ -57,6 +57,13 @@ jobs:
           repository: nabu-platform/poms
           path: poms
 
+      - name: Install published modules BOM
+        run: >-
+          mvn -B dependency:get
+          -Dartifact=be.nabu:modules-bom:1.0-SNAPSHOT:pom
+          -DrepoUrl=https://maven.pkg.github.com/nabu-platform/maven
+          -Dtransitive=false
+
       - name: Install modules parent pom
         working-directory: poms
         run: >-
