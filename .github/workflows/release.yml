@@ -33,8 +33,9 @@ jobs:
           if [ -f "$HOME/.m2/settings.xml" ] && grep -q 'https://maven.pkg.github.com/nabu-platform/maven' "$HOME/.m2/settings.xml"; then
             echo 'GitHub Maven endpoint already configured in settings.xml'
           else
-            cat > "$HOME/.m2/settings.xml" <<'EOF'
-            <settings>
+            python3 - <<'PY'
+            from pathlib import Path
+            Path('/home/runner/.m2/settings.xml').write_text('''<settings>
               <servers>
                 <server>
                   <id>github</id>
@@ -63,7 +64,8 @@ jobs:
                 <activeProfile>github-packages</activeProfile>
               </activeProfiles>
             </settings>
-            EOF
+''')
+            PY
           fi
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
