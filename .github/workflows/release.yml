@@ -39,8 +39,8 @@ jobs:
             <servers>
               <server>
                 <id>github</id>
-                <username>${MAVEN_BUILD_USER}</username>
-                <password>${MAVEN_BUILD_TOKEN}</password>
+                <username>__MAVEN_BUILD_USER__</username>
+                <password>__MAVEN_BUILD_TOKEN__</password>
               </server>
             </servers>
             <profiles>
@@ -65,6 +65,7 @@ jobs:
             </activeProfiles>
           </settings>
           EOF
+          python3 -c "import os; from pathlib import Path; path = Path(os.path.expanduser('~/.m2/settings.xml')); text = path.read_text(); text = text.replace('__MAVEN_BUILD_USER__', os.environ['MAVEN_BUILD_USER']); text = text.replace('__MAVEN_BUILD_TOKEN__', os.environ['MAVEN_BUILD_TOKEN']); path.write_text(text)"
         env:
           MAVEN_BUILD_USER: ${{ secrets.MAVEN_BUILD_USER }}
           MAVEN_BUILD_TOKEN: ${{ secrets.MAVEN_BUILD_TOKEN }}
