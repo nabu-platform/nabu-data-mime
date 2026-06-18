@@ -94,29 +94,24 @@ jobs:
           metadata="$RUNNER_TEMP/modules-bom-metadata.xml"
           curl -fsSL -u "$auth" "$base_url/maven-metadata.xml" -o "$metadata"
           value=$(python3 -c "import sys, xml.etree.ElementTree as ET; root = ET.parse(sys.argv[1]).getroot(); matches = [(node.findtext('updated') or '', node.findtext('value') or '') for node in root.findall('./versioning/snapshotVersions/snapshotVersion') if node.findtext('extension') == 'pom']; assert matches, 'Could not resolve snapshot POM version from metadata'; print(max(matches)[1])" "$metadata")
-          echo "Resolved modules-bom snapshot value: $value"
           python3 -c "import sys; from pathlib import Path; source = Path(sys.argv[1]); target = Path(sys.argv[2]); version = sys.argv[3]; text = source.read_text(); text = text.replace('<artifactId>modules-bom</artifactId>\n\t\t\t\t<version>1.0-SNAPSHOT</version>', f'<artifactId>modules-bom</artifactId>\n\t\t\t\t<version>{version}</version>'); target.write_text(text)" modules.xml "$RUNNER_TEMP/modules-parent.xml" "$value"
-          echo 'Generated modules parent import block:'
-          grep -n -A4 -B2 'modules-bom' "$RUNNER_TEMP/modules-parent.xml"
           mvn -s "$HOME/.m2/settings.xml" -B install:install-file -Dpackaging=pom -Dfile="$RUNNER_TEMP/modules-parent.xml" -DpomFile="$RUNNER_TEMP/modules-parent.xml"
-          echo 'Installed local modules parent import block:'
-          grep -n -A4 -B2 'modules-bom' "$HOME/.m2/repository/be/nabu/modules/1.0-SNAPSHOT/modules-1.0-SNAPSHOT.pom"
         env:
           MAVEN_BUILD_USER: ${{ secrets.MAVEN_BUILD_USER }}
           MAVEN_BUILD_TOKEN: ${{ secrets.MAVEN_BUILD_TOKEN }}
+
 
       - name: Copy dependency types from resolved BOM
         shell: bash
         run: |
           set -euo pipefail
-          python3 -c "import os, urllib.request, xml.etree.ElementTree as ET; from pathlib import Path; metadata = Path(os.environ['RUNNER_TEMP']) / 'modules-bom-metadata.xml'; root = ET.parse(metadata).getroot(); matches = [(node.findtext('updated') or '', node.findtext('value') or '') for node in root.findall('./versioning/snapshotVersions/snapshotVersion') if node.findtext('extension') == 'pom']; assert matches, 'Could not resolve snapshot POM version from metadata'; bom_version = max(matches)[1]; url = f'https://maven.pkg.github.com/nabu-platform/maven/be/nabu/modules-bom/1.0-SNAPSHOT/modules-bom-{bom_version}.pom'; request = urllib.request.Request(url); request.add_header('Authorization', 'Basic ' + __import__('base64').b64encode(f\"{os.environ['MAVEN_BUILD_USER']}:{os.environ['MAVEN_BUILD_TOKEN']}\".encode()).decode()); ns = {'m': 'http://maven.apache.org/POM/4.0.0'}; pom_tree = ET.parse('pom.xml'); pom_root = pom_tree.getroot(); dep_mgmt = ET.parse(urllib.request.urlopen(request)).getroot().find('m:dependencyManagement', ns); managed = {}; 
-for dep in dep_mgmt.find('m:dependencies', ns).findall('m:dependency', ns):
+          python3 -c "import os, urllib.request, xml.etree.ElementTree as ET; from pathlib import Path; metadata = Path(os.environ['RUNNER_TEMP']) / 'modules-bom-metadata.xml'; root = ET.parse(metadata).getroot(); matches = [(node.findtext('updated') or '', node.findtext('value') or '') for node in root.findall('./versioning/snapshotVersions/snapshotVersion') if node.findtext('extension') == 'pom']; assert matches, 'Could not resolve snapshot POM version from metadata'; bom_version = max(matches)[1]; url = f'https://maven.pkg.github.com/nabu-platform/maven/be/nabu/modules-bom/1.0-SNAPSHOT/modules-bom-{bom_version}.pom'; request = urllib.request.Request(url); request.add_header('Authorization', 'Basic ' + __import__('base64').b64encode(f'{os.environ['MAVEN_BUILD_USER']}:{os.environ['MAVEN_BUILD_TOKEN']}'.encode()).decode()); ns = {'m': 'http://maven.apache.org/POM/4.0.0'}; pom_tree = ET.parse('pom.xml'); pom_root = pom_tree.getroot(); deps_node = pom_root.find('m:dependencies', ns); bom_root = ET.parse(urllib.request.urlopen(request)).getroot(); dep_mgmt = bom_root.find('m:dependencyManagement', ns); managed = {}; for dep in dep_mgmt.find('m:dependencies', ns).findall('m:dependency', ns):
 	group_id = dep.findtext('m:groupId', default='', namespaces=ns)
 	artifact_id = dep.findtext('m:artifactId', default='', namespaces=ns)
 	type_value = dep.findtext('m:type', default='', namespaces=ns)
 	if type_value:
 		managed[(group_id, artifact_id)] = type_value
-for dep in pom_root.find('m:dependencies', ns).findall('m:dependency', ns):
+for dep in ([] if deps_node is None else deps_node.findall('m:dependency', ns)):
 	if dep.find('m:type', ns) is not None:
 		continue
 	group_id = dep.findtext('m:groupId', default='', namespaces=ns)
@@ -127,7 +122,9 @@ for dep in pom_root.find('m:dependencies', ns).findall('m:dependency', ns):
 	type_element = ET.Element('{http://maven.apache.org/POM/4.0.0}type')
 	type_element.text = type_value
 	dep.append(type_element)
-ET.indent(pom_root, space='\t'); pom_tree.write('pom.xml', encoding='unicode')"
+ET.indent(pom_tree, space='\t'); pom_tree.write('pom.xml', encoding='unicode')"
+          echo 'Dependency block after BOM type injection:'
+          grep -n -A4 -B1 'keystore' pom.xml
         env:
           MAVEN_BUILD_USER: ${{ secrets.MAVEN_BUILD_USER }}
           MAVEN_BUILD_TOKEN: ${{ secrets.MAVEN_BUILD_TOKEN }}
@@ -145,12 +142,7 @@ ET.indent(pom_root, space='\t'); pom_tree.write('pom.xml', encoding='unicode')"
           echo "value=$release_version" >> "$GITHUB_OUTPUT"
 
       - name: Set module version
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo 'Parent import block before versions:set:'
-          grep -n -A4 -B2 'modules-bom' "$HOME/.m2/repository/be/nabu/modules/1.0-SNAPSHOT/modules-1.0-SNAPSHOT.pom"
-          mvn -s "$HOME/.m2/settings.xml" -B versions:set -DnewVersion=${{ steps.version.outputs.value }} -DgenerateBackupPoms=false
+        run: mvn -s "$HOME/.m2/settings.xml" -B versions:set -DnewVersion=${{ steps.version.outputs.value }} -DgenerateBackupPoms=false
 
       - name: Prepare signing keystore
         shell: bash
