@@ -111,6 +111,8 @@ jobs:
           import xml.etree.ElementTree as ET
           from pathlib import Path
 
+          ET.register_namespace('', 'http://maven.apache.org/POM/4.0.0')
+          ET.register_namespace('xsi', 'http://www.w3.org/2001/XMLSchema-instance')
           ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
           metadata = Path(os.environ['RUNNER_TEMP']) / 'modules-bom-metadata.xml'
           root = ET.parse(metadata).getroot()
