@@ -58,6 +58,7 @@ jobs:
           path: poms
 
       - name: Install published modules BOM
+        working-directory: poms
         shell: bash
         run: |
           set -euo pipefail
