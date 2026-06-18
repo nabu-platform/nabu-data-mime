@@ -39,8 +39,8 @@ jobs:
             <servers>
               <server>
                 <id>github</id>
-                <username>${env.MAVEN_BUILD_USER}</username>
-                <password>${env.MAVEN_BUILD_TOKEN}</password>
+                <username>${MAVEN_BUILD_USER}</username>
+                <password>${MAVEN_BUILD_TOKEN}</password>
               </server>
             </servers>
             <profiles>
