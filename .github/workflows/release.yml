@@ -33,7 +33,36 @@ jobs:
           if [ -f "$HOME/.m2/settings.xml" ] && grep -q 'https://maven.pkg.github.com/nabu-platform/maven' "$HOME/.m2/settings.xml"; then
             echo 'GitHub Maven endpoint already configured in settings.xml'
           else
-            python3 -c 'from pathlib import Path; Path("/home/runner/.m2/settings.xml").write_text("""<settings>\n  <servers>\n    <server>\n      <id>github</id>\n      <username>${env.MAVEN_BUILD_USER}</username>\n      <password>${env.MAVEN_BUILD_TOKEN}</password>\n    </server>\n  </servers>\n  <profiles>\n    <profile>\n      <id>github-packages</id>\n      <repositories>\n        <repository>\n          <id>github</id>\n          <url>https://maven.pkg.github.com/nabu-platform/maven</url>\n          <releases>\n            <enabled>true</enabled>\n          </releases>\n          <snapshots>\n            <enabled>true</enabled>\n          </snapshots>\n        </repository>\n      </repositories>\n    </profile>\n  </profiles>\n  <activeProfiles>\n    <activeProfile>github-packages</activeProfile>\n  </activeProfiles>\n</settings>\n""")'
+            printf '%s\n' \
+              '<settings>' \
+              '  <servers>' \
+              '    <server>' \
+              '      <id>github</id>' \
+              '      <username>${env.MAVEN_BUILD_USER}</username>' \
+              '      <password>${env.MAVEN_BUILD_TOKEN}</password>' \
+              '    </server>' \
+              '  </servers>' \
+              '  <profiles>' \
+              '    <profile>' \
+              '      <id>github-packages</id>' \
+              '      <repositories>' \
+              '        <repository>' \
+              '          <id>github</id>' \
+              '          <url>https://maven.pkg.github.com/nabu-platform/maven</url>' \
+              '          <releases>' \
+              '            <enabled>true</enabled>' \
+              '          </releases>' \
+              '          <snapshots>' \
+              '            <enabled>true</enabled>' \
+              '          </snapshots>' \
+              '        </repository>' \
+              '      </repositories>' \
+              '    </profile>' \
+              '  </profiles>' \
+              '  <activeProfiles>' \
+              '    <activeProfile>github-packages</activeProfile>' \
+              '  </activeProfiles>' \
+              '</settings>' > "$HOME/.m2/settings.xml"
           fi
           python3 -c "import xml.etree.ElementTree as ET; root = ET.parse('/home/runner/.m2/settings.xml').getroot(); server = root.find('./servers/server[id=\"github\"]'); profile = root.find('./profiles/profile[id=\"github-packages\"]'); repo = profile.find('./repositories/repository[url=\"https://maven.pkg.github.com/nabu-platform/maven\"]') if profile is not None else None; print('settings server github present:', server is not None); print('settings server github username placeholder present:', server is not None and (server.findtext('username') or '').startswith('${env.')); print('settings server github password placeholder present:', server is not None and (server.findtext('password') or '').startswith('${env.')); print('settings github-packages profile present:', profile is not None); print('settings github repository present:', repo is not None)"
         env:
